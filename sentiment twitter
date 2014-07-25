@@ -1,0 +1,68 @@
+library(twitteR)
+library(ROAuth)
+library(ggplot2)
+
+
+kejriwal.list <- searchTwitter('#kejriwal', n=1000)
+
+#twListToDF() will take a list of objects from a single twitteR class and return a data.frame version of the members
+kejriwal.df =twListToDF(kejriwal.list)
+write.csv(kejriwal.df, file='c:/test/kejriwal.csv', row.names=F)
+
+
+library(plyr)
+library(stringr)
+#The sentiment analysis uses two packages plyr and stringr to manipulate strings. 
+
+score.sentiment= function(sentence, pos.words, neg.words, .progress='none')
+{
+  require(plyr)
+  require(stringr)
+  
+  scores= laply(sentence, function(sentence, pos.words, neg.words){
+    sentence = gsub('[[:punct:]]', '', sentence)
+    sentence = gsub('[[:cntrl:]]', '', sentence)
+    sentence = gsub('\\d+', '', sentence)
+    
+    sentence = tolower(sentence)
+    
+    word.list = str_split(sentence, '\\s+')
+    
+    words = unlist(word.list)
+    
+    pos.matches = match(words, pos.words)
+    neg.matches = match(words, neg.words)
+    
+    pos.matches = !is.na(pos.matches)
+    neg.matches = !is.na(neg.matches)
+    
+    score = sum(pos.matches) - sum(neg.matches)
+    return(score)
+  }, pos.words, neg.words, .progress=.progress)
+  scores.df = data.frame(score=scores, text=sentence)
+  return(scores.df)
+}
+
+#scoring tweets and adding column
+hu.liu.pos = scan('c:/test/positive-words.txt', what='character', comment.char = ';')
+hu.liu.neg = scan('c:/test/negative-words.txt', what='character', comment.char = ';')
+
+pos.words = c(hu.liu.pos, 'upgrade')
+neg.words = c(hu.liu.neg, 'wtf', 'wait', 'waiting', 'epicfail', 'mechanical')
+
+
+#import the csv file
+DatasetKejriwal <- read.csv("C:/test/kejriwal.csv")
+DatasetKejriwal$text <- as.factor(DatasetKejriwal$text)
+
+#score all tweets
+kejriwal.scores = score.sentiment(DatasetKejriwal$text, pos.words, neg.words, .progress = 'text')
+path <- "c:/test/"
+write.csv(kejriwal.scores, file=paste(path, "kejriwalScores.csv", sep=""), row.names=TRUE)
+View(kejriwal.scores)
+
+#Visualizing the tweets
+
+hist(kejriwal.scores$score, xlab="Score of Tweets", col="red")
+
+qplot(kejriwal.scores$score, xlab = "Score of Tweets")
